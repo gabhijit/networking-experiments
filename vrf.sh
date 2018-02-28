@@ -82,12 +82,49 @@ function delete_provider_core_namespaces
 	${IP} netns del pc 2> /dev/null
 }
 
+function create_customer_interfaces
+{
+	# c1h1, c1h2, c2h1, c2h2
+	br=1
+	for cust in `seq 1 2`; do
+		for host in `seq 1 2`; do
+			_do_create_cust_interface ${cust} ${host} ${br}
+		done
+		${IP} addr add 88.${br}.1.254/24 dev br${br}-c${cust}
+	done
+
+	# c1h3, c1h4, c2h3, c2h4
+	br=2
+	for cust in `seq 1 2`; do
+		for host in `seq 3 4`; do
+			_do_create_cust_interface ${cust} ${host} ${br}
+		done
+		${IP} addr add 88.${br}.1.254/24 dev br${br}-c${cust}
+	done
+}
+
+function _do_create_cust_interface
+{
+	cust=${1}
+	host=${2}
+	br=${3}
+
+	custhost=c${1}h${2}
+	custbr=br${br}-c${cust}
+
+	${IP} link add ${custhost}-eth0 type veth peer name ${custbr}-eth${host};
+	${IP} link set ${custhost}-eth0 netns ${custhost};
+	${IP} link set ${custbr}-eth${host} master ${custbr};
+	${IP} netns exec ${custhost} ${IP} addr add  88.${br}.1.${host}/24 dev ${custhost}-eth0
+}
+
+
 function create_customer_bridges
 {
 	echo "inside create_customer_bridges"
 	for i in `seq 1 2`; do
 		for j in `seq 1 2`; do
-			ip link add br${j}-c${i} type bridge || { echo "error: ${IP} link add br${j}-c${i} type bridge"; cleanupl exit -1;}
+			${IP} link add br${j}-c${i} type bridge || { echo "error: ${IP} link add br${j}-c${i} type bridge"; cleanupl exit -1;}
 		done
 	done
 }
@@ -97,7 +134,7 @@ function delete_customer_bridges
 	echo "inside delete_customer_bridges"
 	for i in `seq 1 2`; do
 		for j in `seq 1 2`; do
-			ip link del br${j}-c${i} 2> /dev/null
+			${IP} link del br${j}-c${i} 2> /dev/null
 		done
 	done
 }
@@ -111,16 +148,20 @@ function setup
 
 	#setup bridges
 	create_customer_bridges
+
+	#setup customer interfaces
+	create_customer_interfaces
 }
 
 function list_namespaces
 {
-	ip netns list
+	${IP} netns list
 }
 
 function list_interfaces
 {
-	ip link list
+	${IP} link list
+	${IP} addr list
 }
 
 function cleanup
