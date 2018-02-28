@@ -135,10 +135,11 @@ function create_cepe_interfaces
 
 		${IP} link add ${ce}-eth type veth peer name ${pe}-eth${cust}
 		${IP} link set ${ce}-eth netns ${ce}
-		${IP} link set ${pe}-eth${cust} netns ${pe}
+		#${IP} link set ${pe}-eth${cust} netns ${pe}
 
 		${IP} netns exec ${ce} ${IP} addr add 3.${cust}.1.2/30 dev ${ce}-eth
-		${IP} netns exec ${pe} ${IP} addr add 3.${cust}.1.1/30 dev ${pe}-eth${cust}
+		${IP} addr add 3.${cust}.1.1/30 dev ${pe}-eth${cust}
+		#${IP} netns exec ${pe} ${IP} addr add 3.${cust}.1.1/30 dev ${pe}-eth${cust}
 	done
 
 	for cust in `seq 1 2`; do
@@ -149,10 +150,11 @@ function create_cepe_interfaces
 
 		${IP} link add ${ce}-eth type veth peer name ${pe}-eth${cust}
 		${IP} link set ${ce}-eth netns ${ce}
-		${IP} link set ${pe}-eth${cust} netns ${pe}
+		#${IP} link set ${pe}-eth${cust} netns ${pe}
 
 		${IP} netns exec ${ce} ${IP} addr add 1.1.1.2/30 dev ${ce}-eth
-		${IP} netns exec ${pe} ${IP} addr add 1.1.1.1/30 dev ${pe}-eth${cust}
+		${IP} addr add 1.1.1.1/30 dev ${pe}-eth${cust}
+		#${IP} netns exec ${pe} ${IP} addr add 1.1.1.1/30 dev ${pe}-eth${cust}
 	done
 
 }
@@ -176,6 +178,46 @@ function create_core_interfaces
 
 }
 
+function create_vrf_interfaces
+{
+	for edge in `seq 1 2`; do
+		for cust in `seq 1 2`; do
+			${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
+			#${IP} netns exec pe${edge} ${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
+			${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
+		done
+	done
+
+	# ${IP} link add vrf-pe1-cust2 type vrf table 112
+	# ${IP} link set pe1-eth2 master vrf-pe1-cust2
+
+	# FIXME : netns does not work :(
+	#${IP} link set vrf-pe1-cust1 netns pe1
+	#${IP} link set vrf-pe1-cust2 netns pe1
+
+	# ${IP} link add vrf-pe2-cust1 type vrf table 121
+	# ${IP} link set pe2-eth1 master vrf-pe2-cust1
+
+	# ${IP} link add vrf-pe2-cust2 type vrf table 122
+	# ${IP} link set per-eth2 master vrf-pe2-cust2
+
+	#${IP} link set vrf-pe2-cust1 netns pe2
+	#${IP} link set vrf-pe2-cust2 netns pe2
+
+
+}
+
+function delete_vrf_interfaces
+{
+	for edge in `seq 1 2`; do
+		for cust in `seq 1 2`; do
+			${IP} link del vrf-pe${edge}-c${cust}
+			#${IP} netns exec pe${edge} ${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
+		done
+	done
+}
+
+
 function create_customer_bridges
 {
 	echo "inside create_customer_bridges"
@@ -195,6 +237,8 @@ function delete_customer_bridges
 		done
 	done
 }
+
+
 function setup
 {
 	# first setup namespaces
@@ -222,7 +266,7 @@ function setup
 	echo "all interfaces setup..."
 
 	#create VRF interfaces
-
+	create_vrf_interfaces
 }
 
 function list_namespaces
@@ -238,6 +282,9 @@ function list_interfaces
 
 function cleanup
 {
+	#delete vrfs
+	delete_vrf_interfaces
+
 	#delete bridges
 	delete_customer_bridges
 
