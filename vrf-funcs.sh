@@ -233,6 +233,26 @@ function setup_mpls
 function setup_routing
 {
 	echo "inside setup_routing"
+
+	#FIXME : remove duplcate commands
+
+	for cust in `seq 1 2`; do
+		${IP} link set c${cust}e1-br-eth1 up
+		${IP} netns exec c${cust}h1 ${IP} link set c${cust}h1-eth0 up
+		${IP} netns exec c${cust}h1 ${IP} route add 88.2.1.0/24 via 88.1.1.254
+
+		${IP} link set c${cust}e1-br-eth2 up
+		${IP} netns exec c${cust}h2 ${IP} link set c${cust}h2-eth0 up
+		${IP} netns exec c${cust}h2 ${IP} route add 88.2.1.0/24 via 88.1.1.254
+
+		${IP} link set c${cust}e2-br-eth3 up
+		${IP} netns exec c${cust}h3 ${IP} link set c${cust}h3-eth0 up
+		${IP} netns exec c${cust}h3 ${IP} route add 88.1.1.0/24 via 88.2.1.254
+
+		${IP} link set c${cust}e2-br-eth4 up
+		${IP} netns exec c${cust}h4 ${IP} link set c${cust}h4-eth0 up
+		${IP} netns exec c${cust}h4 ${IP} route add 88.1.1.0/24 via 88.2.1.254
+	done
 }
 
 function create_customer_bridges
