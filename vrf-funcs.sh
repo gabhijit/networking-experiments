@@ -164,6 +164,8 @@ function create_core_interfaces
 	${IP} link add pe1-eth type veth peer name pc-eth1
 	${IP} link set pe1-eth netns pe1
 	${IP} link set pc-eth1 netns pc
+	${IP} netns exec pe1 ${IP} link set pe1-eth up
+	${IP} netns exec pc ${IP} link set pc-eth1 up
 
 	${IP} netns exec pe1 ${IP} addr add 2.1.1.1/30 dev pe1-eth
 	${IP} netns exec pc ${IP} addr add 2.1.1.2/30 dev pc-eth1
@@ -172,9 +174,11 @@ function create_core_interfaces
 	${IP} link add pe2-eth type veth peer name pc-eth2
 	${IP} link set pe2-eth netns pe2
 	${IP} link set pc-eth2 netns pc
+	${IP} netns exec pe2 ${IP} link set pe2-eth up
+	${IP} netns exec pc ${IP} link set pc-eth2 up
 
-	${IP} netns exec pe2 ${IP} addr add 2.1.1.4/30 dev pe2-eth
-	${IP} netns exec pc ${IP} addr add 2.1.1.6/30 dev pc-eth2
+	${IP} netns exec pe2 ${IP} addr add 2.1.1.6/30 dev pe2-eth
+	${IP} netns exec pc ${IP} addr add 2.1.1.5/30 dev pc-eth2
 
 }
 
@@ -186,6 +190,9 @@ function create_vrf_interfaces
 			${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
 		done
 	done
+
+	# copied from https://netdevconf.org/1.2/papers/ahern-what-is-l3mdev-paper.pdf
+	${IP} rule add l3mdev pref 1000
 
 	# ${IP} link add vrf-pe1-cust2 type vrf table 112
 	# ${IP} link set pe1-eth2 master vrf-pe1-cust2
@@ -214,6 +221,7 @@ function delete_vrf_interfaces
 			#${IP} netns exec pe${edge} ${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
 		done
 	done
+	${IP} rule del pref 1000
 }
 
 function setup_mpls
@@ -226,7 +234,9 @@ function setup_mpls
 			sysctl -w net.mpls.conf.pe${edge}-eth${cust}.input=1
 		done
 		${IP} netns exec pe${edge} sysctl -w net.mpls.conf.pe${edge}-eth.input=1
+		${IP} netns exec pe${edge} sysctl -w net.mpls.platform_labels=10000
 		${IP} netns exec pc sysctl -w net.mpls.conf.pc-eth${edge}.input=1
+		${IP} netns exec pc sysctl -w net.mpls.platform_labels=10000
 	done
 }
 
@@ -234,8 +244,11 @@ function setup_routing
 {
 	echo "inside setup_routing"
 
-	#FIXME : remove duplcate commands
+	# FIXME : remove duplcate commands
 
+	# FIXME : Move into separate functions
+
+	# customer hosts
 	for cust in `seq 1 2`; do
 		${IP} link set c${cust}e1-br-eth1 up
 		${IP} netns exec c${cust}h1 ${IP} link set c${cust}h1-eth0 up
@@ -253,6 +266,52 @@ function setup_routing
 		${IP} netns exec c${cust}h4 ${IP} link set c${cust}h4-eth0 up
 		${IP} netns exec c${cust}h4 ${IP} route add 88.1.1.0/24 via 88.2.1.254
 	done
+
+
+	# cepe edges
+	${IP} netns exec c1e1 ${IP} link set c1e1-eth up
+	${IP} link set pe1-eth1 up
+	${IP} netns exec c1e1 ${IP} route add 88.2.1.0/24 via 1.1.1.2
+
+	${IP} netns exec c2e1 ${IP} link set c2e1-eth up
+	${IP} link set pe1-eth2 up
+	${IP} netns exec c2e1 ${IP} route add 88.2.1.0/24 via 1.1.1.2
+
+	${IP} netns exec c1e2 ${IP} link set c1e2-eth up
+	${IP} link set pe2-eth1 up
+	${IP} netns exec c1e2 ${IP} route add 88.1.1.0/24 via 3.1.1.1
+
+	${IP} netns exec c2e2 ${IP} link set c2e2-eth up
+	${IP} link set pe2-eth2 up
+	${IP} netns exec c2e2 ${IP} route add 88.1.1.0/24 via 3.2.1.1
+
+	# mpls network
+
+	# pe1 push mpls
+	${IP} netns exec pe1 ${IP} route add 88.2.1.0/24 encap mpls 101 via 2.1.1.2 table 111
+	${IP} netns exec pe1 ${IP} route add 88.2.1.0/24 encap mpls 201 via 2.1.1.2 table 112
+
+	# pe2 push mpls
+	${IP} netns exec pe2 ${IP} route add 88.1.1.0/24 encap mpls 102 via 2.1.1.5 table 121
+	${IP} netns exec pe2 ${IP} route add 88.1.1.0/24 encap mpls 202 via 2.1.1.5 table 122
+
+	# pc mpls
+	# to pe2
+	${IP} netns exec pc ${IP} -f mpls route add 101 as 111 via inet 2.1.1.6
+	echo "${IP} netns exec pc ${IP} -f mpls route add 101 as 111 via inet 2.1.1.6"
+	${IP} netns exec pc ${IP} -f mpls route add 201 as 211 via inet 2.1.1.6
+
+	# to pe1
+	${IP} netns exec pc ${IP} -f mpls route add 102 as 112 via inet 2.1.1.1
+	${IP} netns exec pc ${IP} -f mpls route add 202 as 212 via inet 2.1.1.1
+
+	# pe1 pop mpls label
+	${IP} -f mpls route add 112 table 111 via inet 1.1.1.1
+	${IP} -f mpls route add 212 table 112 via inet 1.1.1.1
+
+	# pe2 pop mpls label
+	${IP} -f mpls route add 111 table 121 via inet 3.1.1.2
+	${IP} -f mpls route add 211 table 122 via inet 3.2.1.2
 }
 
 function create_customer_bridges
