@@ -217,6 +217,19 @@ function delete_vrf_interfaces
 	done
 }
 
+function setup_mpls
+{
+	modprobe mpls_router
+	sysctl -w net.mpls.platform_labels=10000
+
+	for edge in `seq 1 2`; do
+		for cust in `seq 1 2`;do
+			sysctl -w net.mpls.conf.pe${edge}-eth${cust}.input=1
+		done
+		${IP} netns exec pe${edge} sysctl -w net.mpls.conf.pe${edge}-eth.input=1
+		${IP} netns exec pc sysctl -w net.mpls.conf.pc-eth${edge}.input=1
+	done
+}
 
 function create_customer_bridges
 {
@@ -267,6 +280,10 @@ function setup
 
 	#create VRF interfaces
 	create_vrf_interfaces
+
+	#setup mpls
+	setup_mpls
+
 }
 
 function list_namespaces
