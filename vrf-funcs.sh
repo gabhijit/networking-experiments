@@ -183,7 +183,6 @@ function create_vrf_interfaces
 	for edge in `seq 1 2`; do
 		for cust in `seq 1 2`; do
 			${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
-			#${IP} netns exec pe${edge} ${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
 			${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
 		done
 	done
@@ -229,6 +228,11 @@ function setup_mpls
 		${IP} netns exec pe${edge} sysctl -w net.mpls.conf.pe${edge}-eth.input=1
 		${IP} netns exec pc sysctl -w net.mpls.conf.pc-eth${edge}.input=1
 	done
+}
+
+function setup_routing
+{
+	echo "inside setup_routing"
 }
 
 function create_customer_bridges
@@ -284,6 +288,9 @@ function setup
 	#setup mpls
 	setup_mpls
 
+	#setup routing now
+	setup_routing
+
 }
 
 function list_namespaces
@@ -311,9 +318,3 @@ function cleanup
 	delete_provider_edge_namespaces
 	delete_provider_core_namespaces
 }
-
-setup
-#list_namespaces
-#list_interfaces
-cleanup
-list_namespaces
