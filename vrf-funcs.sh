@@ -9,10 +9,6 @@
 IP=/media/gabhijit/opencontrail/gabhijit-home/backup/personal-code/iproute2/ip/ip
 
 
-# Create network namespace for each of the devices
-# c1h1, c1h2, c1h3 and c1h4 are Customer 1 machines. Let's create a namespace for each
-# c2h1, c2h2, c2h3 and c2h4 are Customer 2 machines. Let's create a namespace for each
-
 function create_customer_host_namespaces
 {
 	echo "inside create_customer_host_namespaces"
@@ -102,10 +98,6 @@ function create_customer_interfaces
 		for host in `seq 3 4`; do
 			_do_create_cust_interface ${cust} ${host} ${edge}
 		done
-
-		ce=c${cust}e${edge}
-		cebr=${ce}-br
-		${IP} addr add 88.${edge}.1.254/24 dev ${cebr}
 	done
 }
 
@@ -124,6 +116,15 @@ function _do_create_cust_interface
 	${IP} netns exec ${custhost} ${IP} addr add  88.${edge}.1.${host}/24 dev ${custhost}-eth0
 }
 
+function create_cehost_interfaces
+{
+	edge=1
+	for cust in `seq 1 2`; do
+		custedge=c${cust}e${edge}
+		${IP} link add ${custedge}-eth0 type veth peer name ${custedge}-br-eth${cust};
+	done
+}
+
 function create_cepe_interfaces
 {
 
@@ -135,6 +136,7 @@ function create_cepe_interfaces
 
 		${IP} link add ${ce}-eth type veth peer name ${pe}-eth${cust}
 		${IP} link set ${ce}-eth netns ${ce}
+		# since we cannot add vrf to netns, we've to keep it here
 		#${IP} link set ${pe}-eth${cust} netns ${pe}
 
 		${IP} netns exec ${ce} ${IP} addr add 3.${cust}.1.2/30 dev ${ce}-eth
@@ -149,11 +151,12 @@ function create_cepe_interfaces
 		pe=pe${edge}
 
 		${IP} link add ${ce}-eth type veth peer name ${pe}-eth${cust}
+		${IP} link set ${ce}-eth master ${ce}-br
 		${IP} link set ${ce}-eth netns ${ce}
 		#${IP} link set ${pe}-eth${cust} netns ${pe}
 
-		${IP} netns exec ${ce} ${IP} addr add 1.1.1.2/30 dev ${ce}-eth
-		${IP} addr add 1.1.1.1/30 dev ${pe}-eth${cust}
+		${IP} netns exec ${ce} ${IP} addr add 1.1.1.1/30 dev ${ce}-eth
+		${IP} addr add 1.1.1.2/30 dev ${pe}-eth${cust}
 		#${IP} netns exec ${pe} ${IP} addr add 1.1.1.1/30 dev ${pe}-eth${cust}
 	done
 
@@ -194,24 +197,6 @@ function create_vrf_interfaces
 
 	# copied from https://netdevconf.org/1.2/papers/ahern-what-is-l3mdev-paper.pdf
 	${IP} rule add l3mdev pref 1000
-
-	# ${IP} link add vrf-pe1-cust2 type vrf table 112
-	# ${IP} link set pe1-eth2 master vrf-pe1-cust2
-
-	# FIXME : netns does not work :(
-	#${IP} link set vrf-pe1-cust1 netns pe1
-	#${IP} link set vrf-pe1-cust2 netns pe1
-
-	# ${IP} link add vrf-pe2-cust1 type vrf table 121
-	# ${IP} link set pe2-eth1 master vrf-pe2-cust1
-
-	# ${IP} link add vrf-pe2-cust2 type vrf table 122
-	# ${IP} link set per-eth2 master vrf-pe2-cust2
-
-	#${IP} link set vrf-pe2-cust1 netns pe2
-	#${IP} link set vrf-pe2-cust2 netns pe2
-
-
 }
 
 function delete_vrf_interfaces
@@ -322,6 +307,7 @@ function create_customer_bridges
 	for cust in `seq 1 2`; do
 		for edge in `seq 1 2`; do
 			${IP} link add c${cust}e${edge}-br type bridge || { echo "error: ${IP} link add c${cust}e${edge}-br type bridge"; cleanupl exit -1;}
+			${IP} link set c${cust}e${edge}-br up
 		done
 	done
 }
