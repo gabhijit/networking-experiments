@@ -211,12 +211,86 @@ function delete_p_routers
 	${IP} netns del p
 }
 
+function setup_mpls
+{
+	modprobe mpls_router
+	sysctl -w net.mpls.platform_labels=10000
+
+	${IP} netns exec p sysctl -w net.mpls.platform_labels=10000
+
+	for edge in `seq 1 2`; do
+		for cust in `seq 1 2`;do
+			sysctl -w net.mpls.conf.pe${edge}-c${cust}e${edge}-eth.input=1
+		done
+		sysctl -w net.mpls.conf.pe${edge}-p-eth.input=1
+
+		# for core
+		${IP} netns exec p sysctl -w net.mpls.conf.p-pe${edge}-eth.input=1
+	done
+}
+
+function setup_routing
+{
+	echo "1..."
+	# first at each of the hosts
+	for cust in `seq 1 2`; do
+		for host in `seq 1 2`; do
+			custhost=c${cust}h${host}
+			${IP} netns exec ${custhost} ${IP} route add default via 88.1.1.254 dev ${custhost}-eth
+		done
+	done
+
+	for cust in `seq 1 2`; do
+		for host in `seq 3 4`; do
+			custhost=c${cust}h${host}
+			${IP} netns exec ${custhost} ${IP} route add default via 88.2.1.254 dev ${custhost}-eth
+		done
+	done
+
+	echo "2..."
+	# setup at ce routers
+	${IP} netns exec c1e1 ${IP} route add default via 1.1.1.2 dev c1e1-pe1-eth
+	${IP} netns exec c2e1 ${IP} route add default via 1.1.1.2 dev c2e1-pe1-eth
+	${IP} netns exec c1e2 ${IP} route add default via 3.1.1.1 dev c1e2-pe2-eth
+	${IP} netns exec c2e2 ${IP} route add default via 3.1.1.1 dev c2e2-pe2-eth
+
+	# setup at pe routers
+	${IP} route add 88.2.1.0/24 encap mpls 101 via 2.1.1.2 table 111
+	${IP} route add 88.2.1.0/24 encap mpls 201 via 2.1.1.2 table 112
+
+	${IP} route add 88.1.1.0/24 encap mpls 102 via 2.1.1.5 table 121
+	${IP} route add 88.1.1.0/24 encap mpls 202 via 2.1.1.5 table 122
+
+	# setup at p router
+	# to pe2
+	${IP} netns exec p ${IP} -f mpls route add 101 as 111 via inet 2.1.1.6
+	${IP} netns exec p ${IP} -f mpls route add 201 as 211 via inet 2.1.1.6
+
+	# to pe1
+	${IP} netns exec p ${IP} -f mpls route add 102 as 112 via inet 2.1.1.1
+	${IP} netns exec p ${IP} -f mpls route add 202 as 212 via inet 2.1.1.1
+
+	# pop label at pe routers
+	# pe1 pop mpls label
+	${IP} -f mpls route add 112 dev vrf-pe1-c1
+	${IP} -f mpls route add 212 dev vrf-pe1-c2
+
+	# pe2 pop mpls label
+	${IP} -f mpls route add 111 dev vrf-pe2-c1
+	${IP} -f mpls route add 211 dev vrf-pe2-c2
+
+}
+
 echo "creating..."
 create_bridges
 create_hosts
 create_ce_routers
 create_pe_routers
 create_p_routers
+
+echo "setting up..."
+setup_mpls
+setup_routing
 
 echo "deleting..."
 delete_p_routers
