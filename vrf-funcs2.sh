@@ -170,6 +170,8 @@ function create_pe_routers
 		${IP} link set vrf-pe${edge}-c${cust} up
 		${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
 	done
+
+	${IP} rule add l3mdev pref 1000
 }
 
 function delete_pe_routers
@@ -231,7 +233,6 @@ function setup_mpls
 
 function setup_routing
 {
-	echo "1..."
 	# first at each of the hosts
 	for cust in `seq 1 2`; do
 		for host in `seq 1 2`; do
@@ -247,21 +248,35 @@ function setup_routing
 		done
 	done
 
-	echo "2..."
 	# setup at ce routers
+	${IP} netns exec c1e1 sysctl -w net.ipv4.ip_forward=1
 	${IP} netns exec c1e1 ${IP} route add default via 1.1.1.2 dev c1e1-pe1-eth
+
+	${IP} netns exec c2e1 sysctl -w net.ipv4.ip_forward=1
 	${IP} netns exec c2e1 ${IP} route add default via 1.1.1.2 dev c2e1-pe1-eth
+
+	${IP} netns exec c1e2 sysctl -w net.ipv4.ip_forward=1
 	${IP} netns exec c1e2 ${IP} route add default via 3.1.1.1 dev c1e2-pe2-eth
+
+	${IP} netns exec c2e2 sysctl -w net.ipv4.ip_forward=1
 	${IP} netns exec c2e2 ${IP} route add default via 3.1.1.1 dev c2e2-pe2-eth
+
+
+	# enable IP forwarding
+	sysctl -w net.ipv4.ip_forward=1
 
 	# setup at pe routers
 	${IP} route add 88.2.1.0/24 encap mpls 101 via 2.1.1.2 table 111
+	${IP} route add broadcast 2.1.1.0/30 dev pe1-p-eth table 111
 	${IP} route add 88.2.1.0/24 encap mpls 201 via 2.1.1.2 table 112
+	${IP} route add broadcast 2.1.1.0/30 dev pe1-p-eth table 112
 
 	${IP} route add 88.1.1.0/24 encap mpls 102 via 2.1.1.5 table 121
 	${IP} route add 88.1.1.0/24 encap mpls 202 via 2.1.1.5 table 122
 
 	# setup at p router
+	${IP} netns exec p sysctl -w net.ipv4.ip_forward=1
+
 	# to pe2
 	${IP} netns exec p ${IP} -f mpls route add 101 as 111 via inet 2.1.1.6
 	${IP} netns exec p ${IP} -f mpls route add 201 as 211 via inet 2.1.1.6
@@ -280,21 +295,3 @@ function setup_routing
 	${IP} -f mpls route add 211 dev vrf-pe2-c2
 
 }
-
-echo "creating..."
-create_bridges
-create_hosts
-create_ce_routers
-create_pe_routers
-create_p_routers
-
-echo "setting up..."
-setup_mpls
-setup_routing
-
-echo "deleting..."
-delete_p_routers
-delete_pe_routers
-delete_ce_routers
-delete_hosts
-delete_bridges
