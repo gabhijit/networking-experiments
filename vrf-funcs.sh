@@ -187,6 +187,7 @@ function create_vrf_interfaces
 	for edge in `seq 1 2`; do
 		for cust in `seq 1 2`; do
 			${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
+			${IP} link set vrf-pe${edge}-c${cust} up
 			${IP} link set pe${edge}-eth${cust} master vrf-pe${edge}-c${cust}
 		done
 	done
@@ -237,6 +238,8 @@ function setup_mpls
 		${IP} netns exec pe${edge} sysctl -w net.mpls.platform_labels=10000
 		${IP} netns exec pc sysctl -w net.mpls.conf.pc-eth${edge}.input=1
 		${IP} netns exec pc sysctl -w net.mpls.platform_labels=10000
+		#sysctl -w net.mpls.conf.vrf-pe${edge}-c1.input=1
+		#sysctl -w net.mpls.conf.vrf-pe${edge}-c2.input=1
 	done
 }
 
@@ -298,7 +301,6 @@ function setup_routing
 	# pc mpls
 	# to pe2
 	${IP} netns exec pc ${IP} -f mpls route add 101 as 111 via inet 2.1.1.6
-	echo "${IP} netns exec pc ${IP} -f mpls route add 101 as 111 via inet 2.1.1.6"
 	${IP} netns exec pc ${IP} -f mpls route add 201 as 211 via inet 2.1.1.6
 
 	# to pe1
@@ -306,12 +308,12 @@ function setup_routing
 	${IP} netns exec pc ${IP} -f mpls route add 202 as 212 via inet 2.1.1.1
 
 	# pe1 pop mpls label
-	${IP} -f mpls route add 112 table 111 via inet 1.1.1.1
-	${IP} -f mpls route add 212 table 112 via inet 1.1.1.1
+	${IP} -f mpls route add 112 dev vrf-pe1-c1
+	${IP} -f mpls route add 212 dev vrf-pe1-c2
 
 	# pe2 pop mpls label
-	${IP} -f mpls route add 111 table 121 via inet 3.1.1.2
-	${IP} -f mpls route add 211 table 122 via inet 3.2.1.2
+	${IP} -f mpls route add 111 dev vrf-pe2-c1
+	${IP} -f mpls route add 211 dev vrf-pe2-c2
 }
 
 function create_customer_bridges
