@@ -125,11 +125,102 @@ function delete_ce_routers
 	done
 }
 
+function create_pe_routers
+{
+	edge=1
+	for cust in `seq 1 2`; do
+		custedge=c${cust}e${edge}
+		pe=pe${edge}
+
+		# add veth link
+		${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
+
+		# do ce side setting
+		${IP} link set ${custedge}-${pe}-eth netns ${custedge}
+		${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
+		${IP} netns exec ${custedge} ${IP} addr add 1.1.1.1/30 dev ${custedge}-${pe}-eth
+
+		# do pe side setting
+		${IP} link set ${pe}-${custedge}-eth up
+		${IP} addr add 1.1.1.2/30 dev ${pe}-${custedge}-eth
+
+		${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
+		${IP} link set vrf-pe${edge}-c${cust} up
+		${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+	done
+
+	edge=2
+	for cust in `seq 1 2`; do
+		custedge=c${cust}e${edge}
+		pe=pe${edge}
+
+		# add veth link
+		${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
+
+		# do ce side setting
+		${IP} link set ${custedge}-${pe}-eth netns ${custedge}
+		${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
+		${IP} netns exec ${custedge} ${IP} addr add 3.1.1.2/30 dev ${custedge}-${pe}-eth
+
+		# do pe side setting
+		${IP} link set ${pe}-${custedge}-eth up
+		${IP} addr add 3.1.1.1/30 dev ${pe}-${custedge}-eth
+
+		${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
+		${IP} link set vrf-pe${edge}-c${cust} up
+		${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+	done
+}
+
+function delete_pe_routers
+{
+	${IP} link del vrf-pe1-c1
+	${IP} link del vrf-pe1-c2
+
+	${IP} link del vrf-pe2-c1
+	${IP} link del vrf-pe2-c2
+
+	# pe links will be deleted with ce netns delete
+}
+
+
+function create_p_routers
+{
+	# create netns
+	${IP} netns add p
+
+	# add links to pe1
+	${IP} link add p-pe1-eth type veth peer name pe1-p-eth
+	${IP} link set p-pe1-eth netns p
+	${IP} netns exec p ${IP} link set p-pe1-eth up
+	${IP} netns exec p ${IP} addr add 2.1.1.2/30 dev p-pe1-eth
+	${IP} link set pe1-p-eth up
+	${IP} addr add 2.1.1.1/30 dev pe1-p-eth
+
+	# add links to pe2
+	${IP} link add p-pe2-eth type veth peer name pe2-p-eth
+	${IP} link set p-pe2-eth netns p
+	${IP} netns exec p ${IP} link set p-pe2-eth up
+	${IP} netns exec p ${IP} addr add 2.1.1.5/30 dev p-pe2-eth
+	${IP} link set pe2-p-eth up
+	${IP} addr add 2.1.1.6/30 dev pe2-p-eth
+}
+
+function delete_p_routers
+{
+	${IP} netns del p
+}
+
+echo "creating..."
 create_bridges
 create_hosts
 create_ce_routers
+create_pe_routers
+create_p_routers
 
 echo "deleting..."
+delete_p_routers
+delete_pe_routers
 delete_ce_routers
 delete_hosts
 delete_bridges
