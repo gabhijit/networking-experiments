@@ -128,9 +128,10 @@ function delete_ce_routers
 function create_pe_routers
 {
 	edge=1
+	pe=pe${edge}
+	${IP} netns add ${pe}
 	for cust in `seq 1 2`; do
 		custedge=c${cust}e${edge}
-		pe=pe${edge}
 
 		# add veth link
 		${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
@@ -140,19 +141,22 @@ function create_pe_routers
 		${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
 		${IP} netns exec ${custedge} ${IP} addr add 1.1.1.1/30 dev ${custedge}-${pe}-eth
 
-		# do pe side setting
-		${IP} link set ${pe}-${custedge}-eth up
-		${IP} addr add 1.1.1.2/30 dev ${pe}-${custedge}-eth
-
 		${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
 		${IP} link set vrf-pe${edge}-c${cust} up
 		${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+
+		# Now we can add to netns
+		${IP} link set ${pe}-${custedge}-eth netns ${pe}
+		${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth up
+		${IP} netns exec ${pe} ${IP} addr add 1.1.1.2/30 dev ${pe}-${custedge}-eth
+
 	done
 
 	edge=2
+	pe=pe${edge}
+	${IP} netns add ${pe}
 	for cust in `seq 1 2`; do
 		custedge=c${cust}e${edge}
-		pe=pe${edge}
 
 		# add veth link
 		${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
@@ -162,13 +166,15 @@ function create_pe_routers
 		${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
 		${IP} netns exec ${custedge} ${IP} addr add 3.1.1.2/30 dev ${custedge}-${pe}-eth
 
-		# do pe side setting
-		${IP} link set ${pe}-${custedge}-eth up
-		${IP} addr add 3.1.1.1/30 dev ${pe}-${custedge}-eth
-
 		${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
 		${IP} link set vrf-pe${edge}-c${cust} up
 		${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+
+		# Now we can add to netns
+		${IP} link set ${pe}-${custedge}-eth netns ${pe}
+		${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth up
+		${IP} netns exec ${pe} ${IP} addr add 3.1.1.1/30 dev ${pe}-${custedge}-eth
+
 	done
 
 	${IP} rule add l3mdev pref 1000
@@ -176,15 +182,19 @@ function create_pe_routers
 
 function delete_pe_routers
 {
+	# delete PE namespaces
+	for edge in `seq 1 2`; do
+		${IP} netns del pe${edge}
+	done
+
 	${IP} link del vrf-pe1-c1
 	${IP} link del vrf-pe1-c2
 
 	${IP} link del vrf-pe2-c1
 	${IP} link del vrf-pe2-c2
 
-	# pe links will be deleted with ce netns delete
+	${IP} rule del l3mdev
 }
-
 
 function create_p_routers
 {
@@ -196,16 +206,20 @@ function create_p_routers
 	${IP} link set p-pe1-eth netns p
 	${IP} netns exec p ${IP} link set p-pe1-eth up
 	${IP} netns exec p ${IP} addr add 2.1.1.2/30 dev p-pe1-eth
-	${IP} link set pe1-p-eth up
-	${IP} addr add 2.1.1.1/30 dev pe1-p-eth
+
+	${IP} link set pe1-p-eth netns pe1
+	${IP} netns exec pe1 ${IP} link set pe1-p-eth up
+	${IP} netns exec pe1 ${IP} addr add 2.1.1.1/30 dev pe1-p-eth
 
 	# add links to pe2
 	${IP} link add p-pe2-eth type veth peer name pe2-p-eth
 	${IP} link set p-pe2-eth netns p
 	${IP} netns exec p ${IP} link set p-pe2-eth up
 	${IP} netns exec p ${IP} addr add 2.1.1.5/30 dev p-pe2-eth
-	${IP} link set pe2-p-eth up
-	${IP} addr add 2.1.1.6/30 dev pe2-p-eth
+
+	${IP} link set pe2-p-eth netns pe2
+	${IP} netns exec pe2 ${IP} link set pe2-p-eth up
+	${IP} netns exec pe2 ${IP} addr add 2.1.1.6/30 dev pe2-p-eth
 }
 
 function delete_p_routers
@@ -216,15 +230,16 @@ function delete_p_routers
 function setup_mpls
 {
 	modprobe mpls_router
-	sysctl -w net.mpls.platform_labels=10000
 
 	${IP} netns exec p sysctl -w net.mpls.platform_labels=10000
+	${IP} netns exec pe1 sysctl -w net.mpls.platform_labels=10000
+	${IP} netns exec pe2 sysctl -w net.mpls.platform_labels=10000
 
 	for edge in `seq 1 2`; do
 		for cust in `seq 1 2`;do
-			sysctl -w net.mpls.conf.pe${edge}-c${cust}e${edge}-eth.input=1
+			${IP} netns exec pe${edge} sysctl -w net.mpls.conf.pe${edge}-c${cust}e${edge}-eth.input=1
 		done
-		sysctl -w net.mpls.conf.pe${edge}-p-eth.input=1
+		${IP} netns exec pe${edge} sysctl -w net.mpls.conf.pe${edge}-p-eth.input=1
 
 		# for core
 		${IP} netns exec p sysctl -w net.mpls.conf.p-pe${edge}-eth.input=1
@@ -266,13 +281,15 @@ function setup_routing
 	sysctl -w net.ipv4.ip_forward=1
 
 	# setup at pe routers
-	${IP} route add 88.2.1.0/24 encap mpls 101 via 2.1.1.2 table 111
-	${IP} route add broadcast 2.1.1.0/30 dev pe1-p-eth table 111
-	${IP} route add 88.2.1.0/24 encap mpls 201 via 2.1.1.2 table 112
-	${IP} route add broadcast 2.1.1.0/30 dev pe1-p-eth table 112
+	${IP} netns exec pe1 ${IP} route add 2.1.1.2/32 dev pe1-p-eth table 111
+	${IP} netns exec pe1 ${IP} route add 88.2.1.0/24 encap mpls 101 via 2.1.1.2 table 111
+	${IP} netns exec pe1 ${IP} route add 2.1.1.2/32 dev pe1-p-eth table 112
+	${IP} netns exec pe1 ${IP} route add 88.2.1.0/24 encap mpls 201 via 2.1.1.2 table 112
 
-	${IP} route add 88.1.1.0/24 encap mpls 102 via 2.1.1.5 table 121
-	${IP} route add 88.1.1.0/24 encap mpls 202 via 2.1.1.5 table 122
+	${IP} netns exec pe2 ${IP} route add 2.1.1.5/32 dev pe2-p-eth table 121
+	${IP} netns exec pe2 ${IP} route add 88.1.1.0/24 encap mpls 102 via 2.1.1.5 table 121
+	${IP} netns exec pe2 ${IP} route add 2.1.1.5/32 dev pe2-p-eth table 122
+	${IP} netns exec pe2 ${IP} route add 88.1.1.0/24 encap mpls 202 via 2.1.1.5 table 122
 
 	# setup at p router
 	${IP} netns exec p sysctl -w net.ipv4.ip_forward=1
@@ -287,11 +304,11 @@ function setup_routing
 
 	# pop label at pe routers
 	# pe1 pop mpls label
-	${IP} -f mpls route add 112 dev vrf-pe1-c1
-	${IP} -f mpls route add 212 dev vrf-pe1-c2
+	${IP} netns exec pe1 ${IP} -f mpls route add 112 via inet 1.1.1.1
+	${IP} netns exec pe1 ${IP} -f mpls route add 212 via inet 1.1.1.1
 
 	# pe2 pop mpls label
-	${IP} -f mpls route add 111 dev vrf-pe2-c1
-	${IP} -f mpls route add 211 dev vrf-pe2-c2
+	${IP} netns exec pe2 ${IP} -f mpls route add 111 dev pe2-c1e2-eth
+	${IP} netns exec pe2 ${IP} -f mpls route add 211 dev pe2-c2e2-eth
 
 }
