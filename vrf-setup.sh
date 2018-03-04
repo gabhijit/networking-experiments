@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. vrf-funcs2.sh
+. vrf-funcs.sh
 
 function setup
 {
