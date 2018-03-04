@@ -5,7 +5,8 @@
 # Topology from -
 # https://www.netdevconf.org/1.1/proceedings/slides/ahern-vrf-tutorial.pdf
 
-IP=/media/gabhijit/opencontrail/gabhijit-home/backup/personal-code/iproute2/ip/ip
+# FIXME : setup correct path to supported iproute2
+IP=/path/to/correct/ip
 
 function create_bridges
 {
