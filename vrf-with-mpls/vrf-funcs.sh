@@ -6,7 +6,10 @@
 # https://www.netdevconf.org/1.1/proceedings/slides/ahern-vrf-tutorial.pdf
 
 # FIXME : setup correct path to supported iproute2
+
 IP=/path/to/correct/ip
+
+#IP=../../iproute2/ip/ip
 
 function create_bridges
 {
@@ -39,6 +42,8 @@ function _do_create_host
 	custhost=c${cust}h${host}
 	custbr=br${cust}${edge}
 
+	${IP} netns add ${custhost}
+
 	${IP} link add ${custhost}-eth type veth peer name ${custhost}-${custbr}-eth
 
 	${IP} link set ${custhost}-${custbr}-eth master ${custbr}
@@ -46,6 +51,7 @@ function _do_create_host
 
 	${IP} link set ${custhost}-eth netns ${custhost}
 
+	${IP} netns exec ${custhost} ${IP} link set lo up
 	${IP} netns exec ${custhost} ${IP} link set ${custhost}-eth up
 	${IP} netns exec ${custhost} ${IP} addr add 88.${edge}.1.${host}/24 dev ${custhost}-eth
 
@@ -61,10 +67,6 @@ function create_hosts
 	edge=1
 	for cust in `seq 1 2`; do
 		for host in `seq 1 2`; do
-
-			custhost=c${cust}h${host}
-			${IP} netns add ${custhost}
-
 			_do_create_host ${cust} ${host} ${edge}
 		done
 	done
@@ -72,10 +74,6 @@ function create_hosts
 	edge=2
 	for cust in `seq 1 2`; do
 		for host in `seq 3 4`; do
-
-			custhost=c${cust}h${host}
-			${IP} netns add ${custhost}
-
 			_do_create_host ${cust} ${host} ${edge}
 		done
 	done
@@ -108,6 +106,7 @@ function create_ce_routers
 
 			${IP} link set ${custedge}-eth netns ${custedge}
 
+			${IP} netns exec ${custedge} ${IP} link set lo up
 			${IP} netns exec ${custedge} ${IP} link set ${custedge}-eth up
 			${IP} netns exec ${custedge} ${IP} addr add 88.${edge}.1.254/24 dev ${custedge}-eth
 		done
@@ -125,61 +124,63 @@ function delete_ce_routers
 	done
 }
 
+function _do_create_pe_router {
+
+	cust=$1
+	edge=$2
+
+	custedge=c${cust}e${edge}
+	pe=pe${edge}
+
+	# add veth link
+	${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
+
+	# do ce side setting
+	${IP} link set ${custedge}-${pe}-eth netns ${custedge}
+	${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
+	if [ ${edge} -eq 1 ]; then
+		${IP} netns exec ${custedge} ${IP} addr add 1.1.1.1/30 dev ${custedge}-${pe}-eth
+	else
+		${IP} netns exec ${custedge} ${IP} addr add 3.1.1.2/30 dev ${custedge}-${pe}-eth
+	fi
+
+
+	# Now we can add to netns
+	${IP} link set ${pe}-${custedge}-eth netns ${pe}
+	${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth up
+	if [ ${edge} -eq 1 ]; then
+		${IP} netns exec ${pe} ${IP} addr add 1.1.1.2/30 dev ${pe}-${custedge}-eth
+	else
+		${IP} netns exec ${pe} ${IP} addr add 3.1.1.1/30 dev ${pe}-${custedge}-eth
+	fi
+
+	${IP} netns exec ${pe} ${IP} link add vrf-pe${edge}-c${cust} type vrf table ${cust}0
+	${IP} netns exec ${pe} ${IP} link set vrf-pe${edge}-c${cust} up
+	${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+
+}
+
 function create_pe_routers
 {
 	edge=1
 	pe=pe${edge}
+
 	${IP} netns add ${pe}
+	${IP} netns exec ${pe} ${IP} link set lo up
+
 	for cust in `seq 1 2`; do
-		custedge=c${cust}e${edge}
-
-		# add veth link
-		${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
-
-		# do ce side setting
-		${IP} link set ${custedge}-${pe}-eth netns ${custedge}
-		${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
-		${IP} netns exec ${custedge} ${IP} addr add 1.1.1.1/30 dev ${custedge}-${pe}-eth
-
-		#${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
-		${IP} link add vrf-pe${edge}-c${cust} type vrf table ${cust}0
-
-		# Now we can add to netns
-		${IP} link set ${pe}-${custedge}-eth netns ${pe}
-		${IP} link set vrf-pe${edge}-c${cust} netns ${pe}
-		${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth up
-		${IP} netns exec ${pe} ${IP} addr add 1.1.1.2/30 dev ${pe}-${custedge}-eth
-		${IP} netns exec ${pe} ${IP} link set vrf-pe${edge}-c${cust} up
-		${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+		_do_create_pe_router ${cust} ${edge}
 	done
-	${IP} netns exec ${pe} ${IP} rule add l3mdev pref 1000
 
 	edge=2
 	pe=pe${edge}
+
 	${IP} netns add ${pe}
+	${IP} netns exec ${pe} ${IP} link set lo up
+
 	for cust in `seq 1 2`; do
-		custedge=c${cust}e${edge}
-
-		# add veth link
-		${IP} link add ${custedge}-${pe}-eth type veth peer name ${pe}-${custedge}-eth
-
-		# do ce side setting
-		${IP} link set ${custedge}-${pe}-eth netns ${custedge}
-		${IP} netns exec ${custedge} ${IP} link set ${custedge}-${pe}-eth up
-		${IP} netns exec ${custedge} ${IP} addr add 3.1.1.2/30 dev ${custedge}-${pe}-eth
-
-		#${IP} link add vrf-pe${edge}-c${cust} type vrf table 1${edge}${cust}
-		${IP} link add vrf-pe${edge}-c${cust} type vrf table ${cust}0
-
-		# Now we can add to netns
-		${IP} link set ${pe}-${custedge}-eth netns ${pe}
-		${IP} link set vrf-pe${edge}-c${cust} netns ${pe}
-		${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth up
-		${IP} netns exec ${pe} ${IP} addr add 3.1.1.1/30 dev ${pe}-${custedge}-eth
-		${IP} netns exec ${pe} ${IP} link set vrf-pe${edge}-c${cust} up
-		${IP} netns exec ${pe} ${IP} link set ${pe}-${custedge}-eth master vrf-pe${edge}-c${cust}
+		_do_create_pe_router ${cust} ${edge}
 	done
-	${IP} netns exec ${pe} ${IP} rule add l3mdev pref 1000
 
 }
 
