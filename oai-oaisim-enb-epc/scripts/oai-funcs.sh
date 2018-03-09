@@ -94,11 +94,11 @@ function setup_connectivity {
 
 	${IP} link set enb-sgw-eth netns enb
 	${IP} netns exec enb ${IP} link set enb-sgw-eth up
-	${IP} netns exec enb ${IP} addr add 10.0.0.1/24 dev enb-sgw-eth
+	${IP} netns exec enb ${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
 
 	${IP} link set sgw-enb-eth netns spgw
 	${IP} netns exec spgw ${IP} link set sgw-enb-eth up
-	${IP} netns exec spgw ${IP} addr add 10.0.0.2/24 dev sgw-enb-eth
+	${IP} netns exec spgw ${IP} addr add 10.0.2.2/24 dev sgw-enb-eth
 
 	echo "S1-U connectivity setup..."
 
