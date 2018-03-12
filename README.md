@@ -7,3 +7,5 @@ Here a bunch of shell scripts, that run some experiments on Linux kernel.
    - This directory consists of setup scripts for vrf-with-mpls from [netdev 1.1 tutorial](https://www.netdevconf.org/1.1/proceedings/slides/ahern-vrf-tutorial.pdf)
    - I have tested it with 4.15.0 kernel - uses L3mdev support, so any kernel with that support (and corresponding iproute2) should work
 
+# OAI OAISIM ENB and EPC on Same Node
+	Scripts and configurations to setup OAISIM eNB and EPC on the same node. (Early - don't use yet)
