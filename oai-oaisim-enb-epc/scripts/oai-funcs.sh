@@ -47,6 +47,11 @@ function delete_mme {
 
 function create_spgw {
 	_do_create_node spgw
+
+	# Add a gateway interface and connect it to bridge and outside
+	${IP} netns exec spgw ${IP} link add gw-eth type dummy
+	${IP} netns exec spgw ${IP} link set gw-eth up
+	${IP} netns exec spgw ${IP} addr add 10.0.5.2/25 dev gw-eth
 }
 
 function delete_spgw {
