@@ -20,6 +20,17 @@ function delete_enb {
 
 function create_hss {
 	_do_create_node hss
+
+	# for HSS, we need an interface that connects to default netns to connect to mysql running there
+	# FIXME : run mysql in hss netns as well.
+
+	${IP} link add hss-host-eth type veth peer name host-hss-eth
+	${IP} link set hss-host-eth netns hss
+	${IP} netns exec hss ${IP} link set hss-host-eth up
+	${IP} netns exec hss ${IP} addr add 10.0.4.2/24 dev hss-host-eth
+	${IP} link set host-hss-eth up
+	${IP} addr add 10.0.4.1/24 dev host-hss-eth
+
 }
 
 function delete_hss {
