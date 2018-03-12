@@ -14,5 +14,9 @@ RELEASE=14
 
 CONFIG_FILE=enb.band7.generic.oaisim.local_mme.conf
 
-exec ${IP} netns exec enb ${OPENAIR_TARGETS_BIN_DIR}/oaisim.Rel${RELEASE} -s15 -u1 -b1 -y1 -Q0 -AAWGN -O ${CONFIG_FILE}
+cp ${OPENAIR_TARGETS_BIN_DIR}/.*nvram* .
+
+${IP} netns exec enb insmod ${OPENAIR_TARGETS_BIN_DIR}/ue_ip.ko
+${IP} link set oip1 netns enb
+${IP} netns exec enb ${OPENAIR_TARGETS_BIN_DIR}/oaisim.Rel${RELEASE} -W -s15 -u1 -b1 -y1 -Q0 -AAWGN -O ${CONFIG_FILE}
 
