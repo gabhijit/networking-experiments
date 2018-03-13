@@ -11,11 +11,14 @@ function _do_create_node {
 }
 
 function create_enb {
-	_do_create_node enb
+	#_do_create_node enb
+	echo "creating enb"
 }
 
 function delete_enb {
-	${IP} netns delete enb
+	# ${IP} netns delete enb
+	echo "deleting enb"
+	rmmod ue_ip
 }
 
 function create_hss {
@@ -49,13 +52,22 @@ function create_spgw {
 	_do_create_node spgw
 
 	# Add a gateway interface and connect it to bridge and outside
-	${IP} netns exec spgw ${IP} link add gw-eth type dummy
-	${IP} netns exec spgw ${IP} link set gw-eth up
-	${IP} netns exec spgw ${IP} addr add 10.0.5.2/25 dev gw-eth
+	${IP} link add spgw-br type bridge
+	${IP} link set spgw-br up
+	${IP} addr add 10.0.5.254/24 dev spgw-br
+	${IP} link add spgw-gw-eth type veth peer name gw-br-eth
+	${IP} link set gw-br-eth master spgw-br
+	${IP} link set gw-br-eth up
+	${IP} link set spgw-gw-eth netns spgw
+	#${IP} netns exec spgw ${IP} link add gw-eth type dummy
+	${IP} netns exec spgw ${IP} link set spgw-gw-eth up
+	${IP} netns exec spgw ${IP} addr add 10.0.5.2/24 dev spgw-gw-eth
+	${IP} netns exec spgw ${IP} route add default via 10.0.5.254 dev spgw-gw-eth
 }
 
 function delete_spgw {
 	${IP} netns delete spgw
+	${IP} link del spgw-br
 }
 
 
@@ -65,9 +77,11 @@ function setup_connectivity {
 	# enb - mme (S1-MME)
 	${IP} link add enb-mme-eth type veth peer name mme-enb-eth
 
-	${IP} link set enb-mme-eth netns enb
-	${IP} netns exec enb ${IP} link set enb-mme-eth up
-	${IP} netns exec enb ${IP} addr add 10.0.0.1/24 dev enb-mme-eth
+	#${IP} link set enb-mme-eth netns enb
+	#${IP} netns exec enb ${IP} link set enb-mme-eth up
+	#${IP} netns exec enb ${IP} addr add 10.0.0.1/24 dev enb-mme-eth
+	${IP} link set enb-mme-eth up
+	${IP} addr add 10.0.0.1/24 dev enb-mme-eth
 
 	${IP} link set mme-enb-eth netns mme
 	${IP} netns exec mme ${IP} link set mme-enb-eth up
@@ -108,9 +122,11 @@ function setup_connectivity {
 	# enb - sgw (S1-U)
 	${IP} link add enb-sgw-eth type veth peer name sgw-enb-eth
 
-	${IP} link set enb-sgw-eth netns enb
-	${IP} netns exec enb ${IP} link set enb-sgw-eth up
-	${IP} netns exec enb ${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
+	#${IP} link set enb-sgw-eth netns enb
+	#${IP} netns exec enb ${IP} link set enb-sgw-eth up
+	#${IP} netns exec enb ${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
+	${IP} link set enb-sgw-eth up
+	${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
 
 	${IP} link set sgw-enb-eth netns spgw
 	${IP} netns exec spgw ${IP} link set sgw-enb-eth up
