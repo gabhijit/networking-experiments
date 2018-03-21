@@ -46,6 +46,10 @@ There are some parts of setup that are not yet automated and this is described b
 
 6. After that one can run each of the `run_<nodename>.sh` files in the respective `nodes/<nodename>` directories. Keep in mind the order - HSS, MME and then SPGW (ie. first bring up the EPC) and then run the eNodeB side.
 
+7. It's usually a good idea to start with a fresh database. The required SQL file for the database is available inside `openair-cn/SRC/OAI_HSS/db/oai_db.sql` (Do this with `drop db`, `create db` and `source SQL`).
+
+8. Before starting the CN, it's better to re-create the certificates inside `/usr/local/etc/oai/freeDiameter/` using the scripts inside - `openair-cn/SCRIPTS/check_{hss|mme}_certificate`. Please refer the script usage to do so. Soon will fix the configurations to make sure these are copied inside the "/etc/oai" of the respective netns.
+
 ## Some Known Issues
 
 1. eNodeb (`enb`) does not run in it's own namespace. This is because, the `ue_ip` kernel module doesn't run in non-default namespace. I am planning to fix this in my repository above. This should help one to run eNodeB in a net namespace as well.
