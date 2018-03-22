@@ -53,7 +53,7 @@ There are some parts of setup that are not yet automated and this is described b
 ## Some Known Issues
 
 1. eNodeb (`enb`) does not run in it's own namespace. This is because, the `ue_ip` kernel module doesn't run in non-default namespace. I am planning to fix this in my repository above. This should help one to run eNodeB in a net namespace as well.
-2. The `SGi` interface gateway is not properly configured yet. The plan is to use `MACVTAP` interface, but since this was not running with wireless device, it's not implemented. After testing with a wired interface, will update the script for this.
+2. ~The `SGi` interface gateway is not properly configured yet. The plan is to use `MACVTAP` interface, but since this was not running with wireless device, it's not implemented. After testing with a wired interface, will update the script for this.~ This is now fixed. Now we have SGi on MacVTAP.
 
 Please create Issues, if something doesn't work for you, so that I can fix this.
 
