@@ -51,23 +51,22 @@ function delete_mme {
 function create_spgw {
 	_do_create_node spgw
 
-	# Add a gateway interface and connect it to bridge and outside
-	${IP} link add spgw-br type bridge
-	${IP} link set spgw-br up
-	${IP} addr add 10.0.5.254/24 dev spgw-br
-	${IP} link add spgw-gw-eth type veth peer name gw-br-eth
-	${IP} link set gw-br-eth master spgw-br
-	${IP} link set gw-br-eth up
-	${IP} link set spgw-gw-eth netns spgw
-	#${IP} netns exec spgw ${IP} link add gw-eth type dummy
-	${IP} netns exec spgw ${IP} link set spgw-gw-eth up
-	${IP} netns exec spgw ${IP} addr add 10.0.5.2/24 dev spgw-gw-eth
-	${IP} netns exec spgw ${IP} route add default via 10.0.5.254 dev spgw-gw-eth
+	# Add a MACVTAP Interface and connect it to the underlying eth device
+	# For this we need to get the 'eth' device in our namespace.
+	# Warning: Does not work with WLAN devices
+	# Need to set this interface in promiscuous mode or set the mac for the
+	# macvtap interface properly.
+
+	${IP} link set eth0 netns spgw
+	${IP} netns exec spgw ip link set eth0 up
+	${IP} netns exec spgw ip link add link eth0 name spgw-gw-eth type macvtap
+	${IP} netns exec spgw ip link set spgw-gw-eth up
+	${IP} netns exec spgw ip addr add 192.168.1.100/24 dev spgw-gw-eth
+	${IP} netns exec spgw ip route add default via 192.168.1.1
 }
 
 function delete_spgw {
 	${IP} netns delete spgw
-	${IP} link del spgw-br
 }
 
 
