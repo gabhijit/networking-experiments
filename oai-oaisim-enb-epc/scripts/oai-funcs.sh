@@ -11,8 +11,8 @@ function _do_create_node {
 }
 
 function create_enb {
-	#_do_create_node enb
 	echo "creating enb"
+	_do_create_node enb
 }
 
 function delete_enb {
@@ -76,11 +76,11 @@ function setup_connectivity {
 	# enb - mme (S1-MME)
 	${IP} link add enb-mme-eth type veth peer name mme-enb-eth
 
-	#${IP} link set enb-mme-eth netns enb
-	#${IP} netns exec enb ${IP} link set enb-mme-eth up
-	#${IP} netns exec enb ${IP} addr add 10.0.0.1/24 dev enb-mme-eth
-	${IP} link set enb-mme-eth up
-	${IP} addr add 10.0.0.1/24 dev enb-mme-eth
+	${IP} link set enb-mme-eth netns enb
+	${IP} netns exec enb ${IP} link set enb-mme-eth up
+	${IP} netns exec enb ${IP} addr add 10.0.0.1/24 dev enb-mme-eth
+	#${IP} link set enb-mme-eth up
+	#${IP} addr add 10.0.0.1/24 dev enb-mme-eth
 
 	${IP} link set mme-enb-eth netns mme
 	${IP} netns exec mme ${IP} link set mme-enb-eth up
@@ -121,11 +121,11 @@ function setup_connectivity {
 	# enb - sgw (S1-U)
 	${IP} link add enb-sgw-eth type veth peer name sgw-enb-eth
 
-	#${IP} link set enb-sgw-eth netns enb
-	#${IP} netns exec enb ${IP} link set enb-sgw-eth up
-	#${IP} netns exec enb ${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
-	${IP} link set enb-sgw-eth up
-	${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
+	${IP} link set enb-sgw-eth netns enb
+	${IP} netns exec enb ${IP} link set enb-sgw-eth up
+	${IP} netns exec enb ${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
+	#${IP} link set enb-sgw-eth up
+	#${IP} addr add 10.0.2.1/24 dev enb-sgw-eth
 
 	${IP} link set sgw-enb-eth netns spgw
 	${IP} netns exec spgw ${IP} link set sgw-enb-eth up

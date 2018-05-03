@@ -16,6 +16,8 @@ CONFIG_FILE=enb.band7.generic.oaisim.local_mme.conf
 
 cp ${OPENAIR_TARGETS_BIN_DIR}/.*nvram* .
 
-insmod ${OPENAIR_TARGETS_BIN_DIR}/ue_ip.ko
-${OPENAIR_TARGETS_BIN_DIR}/oaisim.Rel${RELEASE} -W -s15 -u1 -b1 -y1 -Q0 -AAWGN -O ${CONFIG_FILE}
+${IP} netns exec enb bash -c "insmod ${OPENAIR_TARGETS_BIN_DIR}/ue_ip.ko"
+
+${IP} netns exec enb bash -c "${OPENAIR_TARGETS_BIN_DIR}/oaisim.Rel${RELEASE} -W -s15 -u1 -b1 -y1 -Q0 -AAWGN -O ${CONFIG_FILE}"
+
 
