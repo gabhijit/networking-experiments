@@ -8,4 +8,5 @@ Here a bunch of shell scripts, that run some experiments on Linux kernel.
    - I have tested it with 4.15.0 kernel - uses L3mdev support, so any kernel with that support (and corresponding iproute2) should work
 
 # OAI OAISIM ENB and EPC on Same Node
-	Scripts and configurations to setup OAISIM eNB and EPC on the same node.
+
+These are a few scripts and configurations to setup OAISIM eNB and EPC on the same node. Motivation and details are explained [in this blog post](https://hyphenos.io/blog/2018/oai-oaisim-enb-epc-netns/)
